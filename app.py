@@ -113,7 +113,7 @@ with st.sidebar:
     model = st.text_input("Model", value="gemini-2.5-flash")
     st.markdown("Your key is only used for this session.")
 
-with st.form("brief"):
+with st.form("brief_form"):
     c1, c2 = st.columns(2)
     brand = c1.text_input("Brand / page name", placeholder="e.g. Framewrk")
     niche = c2.text_input("Niche", placeholder="e.g. tech and creator tips")
@@ -145,17 +145,17 @@ if submitted:
         try:
             with st.spinner("Planning your content..."):
                 posts = generate_plan(get_client(api_key), model, brief, days)
-            st.session_state.brief = brief
-            st.session_state.plan = posts_to_df(posts)
+            st.session_state.campaign_brief = brief
+            st.session_state.calendar_df = posts_to_df(posts)
         except Exception as e:
             st.error(f"Could not generate the calendar: {e}")
 
-if "plan" in st.session_state:
+if "calendar_df" in st.session_state:
     st.subheader("Your content calendar")
     st.caption("Click any cell to edit it. Nothing is published automatically.")
 
-    st.session_state.plan = st.data_editor(
-        st.session_state.plan,
+    st.session_state.calendar_df = st.data_editor(
+        st.session_state.calendar_df,
         use_container_width=True,
         hide_index=True,
         disabled=["Day"],
@@ -168,26 +168,27 @@ if "plan" in st.session_state:
 
     st.markdown("**Don't like a day? Regenerate it.**")
     r1, r2 = st.columns([1, 3])
-    day_pick = r1.selectbox("Day", st.session_state.plan["Day"].tolist(), label_visibility="collapsed")
+    day_pick = r1.selectbox("Day", st.session_state.calendar_df["Day"].tolist(), label_visibility="collapsed")
     if r2.button("Regenerate this day"):
         if not api_key:
             st.error("Add your Gemini API key in the sidebar.")
         else:
-            df = st.session_state.plan
+            df = st.session_state.calendar_df
             hooks = df.loc[df["Day"] != day_pick, "Hook"].tolist()
             try:
                 with st.spinner(f"Rewriting day {day_pick}..."):
-                    new = regenerate_post(get_client(api_key), model, st.session_state.brief, int(day_pick), hooks)
+                    new = regenerate_post(get_client(api_key), model, st.session_state.campaign_brief, int(day_pick), hooks)
                 new_row = posts_to_df([new]).iloc[0]
                 df.loc[df["Day"] == day_pick, COLUMNS] = new_row.values
-                st.session_state.plan = df
+                st.session_state.calendar_df = df
                 st.rerun()
             except Exception as e:
                 st.error(f"Could not regenerate: {e}")
 
     st.download_button(
         "Download as CSV",
-        st.session_state.plan.to_csv(index=False).encode("utf-8"),
+        st.session_state.calendar_df.to_csv(index=False).encode("utf-8"),
         file_name="socialspark_calendar.csv",
         mime="text/csv",
     )
+    
